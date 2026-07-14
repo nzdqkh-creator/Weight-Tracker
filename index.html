@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Gewicht Tracker</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    margin: 30px;
+    background: #f5f5f5;
+}
+
+.container {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    max-width: 500px;
+}
+
+input, button {
+    font-size: 18px;
+    padding: 10px;
+    margin: 5px;
+}
+
+button {
+    cursor: pointer;
+}
+
+table {
+    width: 100%;
+    margin-top: 20px;
+    border-collapse: collapse;
+}
+
+td, th {
+    border: 1px solid #ccc;
+    padding: 8px;
+}
+
+canvas {
+    margin-top: 20px;
+}
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>Gewicht Tracker</h1>
+
+<label>Gewicht (kg):</label>
+
+<input id="gewicht" type="number" step="0.1">
+
+<button onclick="speichern()">
+Speichern
+</button>
+
+
+<table>
+
+<thead>
+<tr>
+<th>Datum</th>
+<th>Gewicht</th>
+</tr>
+</thead>
+
+<tbody id="liste">
+</tbody>
+
+</table>
+
+
+<canvas id="diagramm"></canvas>
+
+
+</div>
+
+
+<script>
+
+let daten = JSON.parse(localStorage.getItem("gewicht")) || [];
+
+
+function speichern(){
+
+    let wert = document.getElementById("gewicht").value;
+
+
+    if(wert === ""){
+        alert("Bitte Gewicht eingeben");
+        return;
+    }
+
+
+    let eintrag = {
+        datum: new Date().toLocaleDateString(),
+        gewicht: Number(wert)
+    };
+
+
+    daten.push(eintrag);
+
+
+    localStorage.setItem(
+        "gewicht",
+        JSON.stringify(daten)
+    );
+
+
+    document.getElementById("gewicht").value="";
+
+
+    anzeigen();
+
+}
+
+
+
+function anzeigen(){
+
+    let liste = document.getElementById("liste");
+
+    liste.innerHTML="";
+
+
+    daten.forEach(e => {
+
+        liste.innerHTML +=
+        `
+        <tr>
+        <td>${e.datum}</td>
+        <td>${e.gewicht} kg</td>
+        </tr>
+        `;
+
+    });
+
+
+    diagramm();
+
+}
+
+
+
+let chart;
+
+
+function diagramm(){
+
+    let ctx=document
+    .getElementById("diagramm");
+
+
+    if(chart){
+        chart.destroy();
+    }
+
+
+    chart=new Chart(ctx,{
+
+        type:"line",
+
+        data:{
+
+            labels:daten.map(x=>x.datum),
+
+            datasets:[{
+
+                label:"Gewicht kg",
+
+                data:daten.map(x=>x.gewicht),
+
+                borderWidth:2
+
+            }]
+
+        }
+
+    });
+
+}
+
+
+anzeigen();
+
+
+</script>
+
+
+</body>
+</html>
