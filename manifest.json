@@ -1,0 +1,16 @@
+{
+  "name": "Gewicht Tracker",
+  "short_name": "Gewicht",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2b7cff",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "40x40",
+      "type": "image/png"
+    }
+  ]
+}
