@@ -38,12 +38,24 @@ canvas {
     height: 250px;
     border: 1px solid #ddd;
     margin-top: 10px;
+    border-radius: 8px;
+    background: #fafafa;
 }
 
 input {
-    width: 60%;
     font-size: 20px;
     padding: 12px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    box-sizing: border-box;
+}
+
+input[type="number"] {
+    width: 60%;
+}
+
+input[type="date"] {
+    width: 35%;
 }
 
 button {
@@ -55,6 +67,11 @@ button {
     border: none;
     background: #333;
     color: white;
+    cursor: pointer;
+}
+
+button:hover {
+    opacity: 0.8;
 }
 
 table {
@@ -71,6 +88,16 @@ th,td {
 
 .delete {
     background:#aa0000;
+    padding: 6px 12px;
+    border-radius: 5px;
+    border: none;
+    color: white;
+    cursor: pointer;
+    width: auto;
+}
+
+.delete:hover {
+    opacity: 0.8;
 }
 
 </style>
@@ -92,11 +119,17 @@ height="250">
 
 <h3>Neuer Eintrag</h3>
 
+<div style="display: flex; gap: 10px; margin-top: 10px;">
 <input 
 id="gewicht"
 type="number"
 step="0.1"
 placeholder="kg">
+
+<input 
+id="datum"
+type="date">
+</div>
 
 <button onclick="speichern()">
 Speichern
@@ -104,6 +137,10 @@ Speichern
 
 <button onclick="exportieren()">
 📥 Excel Export (CSV)
+</button>
+
+<button onclick="importieren()">
+📤 Import (CSV)
 </button>
 
 <h3>Daten</h3>
@@ -134,13 +171,22 @@ let daten =
 JSON.parse(localStorage.getItem("gewichtDaten"))
 || [];
 
+// Heutiges Datum als Standardwert
+document.getElementById("datum").valueAsDate = new Date();
+
 function speichern(){
 
-let feld =
+let gewichtFeld =
 document.getElementById("gewicht");
 
+let datumFeld =
+document.getElementById("datum");
+
 let wert =
-Number(feld.value);
+Number(gewichtFeld.value);
+
+let datum =
+datumFeld.value;
 
 if(!wert){
 
@@ -150,13 +196,23 @@ return;
 
 }
 
+if(!datum){
+
+alert("Bitte Datum auswählen");
+
+return;
+
+}
+
+// Datum formatieren (DD.MM.YYYY)
+let datumParts = datum.split("-");
+let formatiertesDatum = datumParts[2] + "." + datumParts[1] + "." + datumParts[0];
+
 daten.push({
 
-datum:
-new Date().toLocaleDateString("de-DE"),
-
-gewicht:
-wert
+datum: formatiertesDatum,
+gewicht: wert,
+datumRaw: datum
 
 });
 
@@ -165,7 +221,8 @@ localStorage.setItem(
 JSON.stringify(daten)
 );
 
-feld.value="";
+gewichtFeld.value="";
+datumFeld.valueAsDate = new Date();
 
 anzeigen();
 
@@ -177,6 +234,13 @@ let tabelle =
 document.getElementById("tabelle");
 
 tabelle.innerHTML="";
+
+// Sortieren nach Datum
+daten.sort((a,b) => {
+    if(a.datumRaw < b.datumRaw) return -1;
+    if(a.datumRaw > b.datumRaw) return 1;
+    return 0;
+});
 
 daten.forEach((eintrag,index)=>{
 
@@ -209,18 +273,25 @@ zeichnen();
 
 function loeschen(index){
 
-daten.splice(index,1);
+if(confirm("Eintrag wirklich löschen?")) {
+    daten.splice(index,1);
 
-localStorage.setItem(
-"gewichtDaten",
-JSON.stringify(daten)
-);
+    localStorage.setItem(
+    "gewichtDaten",
+    JSON.stringify(daten)
+    );
 
-anzeigen();
+    anzeigen();
+}
 
 }
 
 function exportieren(){
+
+if(daten.length === 0) {
+    alert("Keine Daten zum Exportieren");
+    return;
+}
 
 let csv =
 "Datum,Gewicht kg\n";
@@ -255,6 +326,101 @@ link.click();
 
 }
 
+function importieren(){
+
+let input = document.createElement('input');
+input.type = 'file';
+input.accept = '.csv';
+
+input.onchange = function(e) {
+    let file = e.target.files[0];
+    let reader = new FileReader();
+    
+    reader.onload = function(event) {
+        let text = event.target.result;
+        let lines = text.split('\n');
+        
+        // Erste Zeile überspringen (Header)
+        for(let i = 1; i < lines.length; i++) {
+            if(lines[i].trim() === '') continue;
+            
+            let parts = lines[i].split(',');
+            if(parts.length >= 2) {
+                let datum = parts[0].trim();
+                let gewicht = parseFloat(parts[1].trim());
+                
+                if(!isNaN(gewicht) && datum) {
+                    // Datum in raw format umwandeln
+                    let datumParts = datum.split('.');
+                    let datumRaw = datumParts[2] + '-' + datumParts[1] + '-' + datumParts[0];
+                    
+                    daten.push({
+                        datum: datum,
+                        gewicht: gewicht,
+                        datumRaw: datumRaw
+                    });
+                }
+            }
+        }
+        
+        localStorage.setItem(
+            "gewichtDaten",
+            JSON.stringify(daten)
+        );
+        
+        anzeigen();
+        alert("Import erfolgreich!");
+    };
+    
+    reader.readAsText(file);
+};
+
+input.click();
+
+}
+
+// Glatte Kurve mit Catmull-Rom Spline
+function zeichneGlatteKurve(ctx, punkte) {
+    if(punkte.length < 2) return;
+    
+    ctx.beginPath();
+    ctx.moveTo(punkte[0].x, punkte[0].y);
+    
+    for(let i = 0; i < punkte.length - 1; i++) {
+        let p0 = punkte[i];
+        let p1 = punkte[i + 1];
+        
+        // Kontrollpunkte für glatte Kurve
+        let cp1x, cp1y, cp2x, cp2y;
+        
+        if(i === 0) {
+            // Erster Punkt
+            cp1x = p0.x + (p1.x - p0.x) * 0.25;
+            cp1y = p0.y;
+            cp2x = p1.x - (p1.x - p0.x) * 0.25;
+            cp2y = p1.y;
+        } else if(i === punkte.length - 2) {
+            // Letzter Punkt
+            let pPrev = punkte[i - 1];
+            cp1x = p0.x + (p1.x - pPrev.x) * 0.25;
+            cp1y = p0.y;
+            cp2x = p1.x - (p1.x - pPrev.x) * 0.25;
+            cp2y = p1.y;
+        } else {
+            let pPrev = punkte[i - 1];
+            let pNext = punkte[i + 2];
+            cp1x = p0.x + (p1.x - pPrev.x) * 0.25;
+            cp1y = p0.y;
+            cp2x = p1.x - (pNext.x - p0.x) * 0.25;
+            cp2y = p1.y;
+        }
+        
+        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p1.x, p1.y);
+    }
+    
+    ctx.stroke();
+}
+
 function zeichnen(){
 
 let canvas =
@@ -263,11 +429,14 @@ document.getElementById("chart");
 let ctx =
 canvas.getContext("2d");
 
+let width = canvas.width;
+let height = canvas.height;
+
 ctx.clearRect(
 0,
 0,
-canvas.width,
-canvas.height
+width,
+height
 );
 
 if(daten.length < 2)
@@ -279,39 +448,76 @@ Math.min(...daten.map(x=>x.gewicht))-1;
 let max =
 Math.max(...daten.map(x=>x.gewicht))+1;
 
-ctx.beginPath();
+// Hintergrund-Gitter
+ctx.strokeStyle = "#e0e0e0";
+ctx.lineWidth = 1;
+
+for(let i = 0; i <= 5; i++) {
+    let yPos = 30 + i * ((height-60) / 5);
+    ctx.beginPath();
+    ctx.moveTo(40, yPos);
+    ctx.lineTo(width-20, yPos);
+    ctx.stroke();
+    
+    // Werte am Rand
+    let value = max - (i * ((max-min) / 5));
+    ctx.fillStyle = "#666";
+    ctx.font = "10px Arial";
+    ctx.textAlign = "right";
+    ctx.fillText(Math.round(value * 10) / 10, 35, yPos + 4);
+}
+
+// Punkte für die Kurve sammeln
+let punkte = [];
 
 daten.forEach((x,i)=>{
 
 let xpos =
 40 +
 i *
-((canvas.width-60) /
+((width-60) /
 (daten.length-1));
 
 let ypos =
-canvas.height-30 -
+height-30 -
 ((x.gewicht-min)/(max-min))
 *
-(canvas.height-60);
+(height-60);
 
-if(i===0)
-
-ctx.moveTo(xpos,ypos);
-
-else
-
-ctx.lineTo(xpos,ypos);
+punkte.push({x: xpos, y: ypos});
 
 });
 
-ctx.strokeStyle="blue";
+// Glatte Kurve zeichnen
+ctx.strokeStyle = "#2b7cff";
+ctx.lineWidth = 3;
+zeichneGlatteKurve(ctx, punkte);
 
-ctx.lineWidth=3;
+// Punkte markieren
+punkte.forEach((p, i) => {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 5, 0, 2 * Math.PI);
+    ctx.fillStyle = "#2b7cff";
+    ctx.fill();
+    ctx.strokeStyle = "white";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+});
 
-ctx.stroke();
+// Letzten Wert anzeigen
+let last = daten[daten.length-1];
+let lastX = 40 + (daten.length-1) * ((width-60) / (daten.length-1));
+let lastY = height-30 - ((last.gewicht-min)/(max-min)) * (height-60);
+
+ctx.fillStyle = "#2b7cff";
+ctx.font = "bold 12px Arial";
+ctx.textAlign = "left";
+ctx.fillText(last.gewicht + " kg", lastX + 8, lastY - 5);
 
 }
+
+// Datum-Feld auf heute setzen
+document.getElementById("datum").valueAsDate = new Date();
 
 anzeigen();
 
