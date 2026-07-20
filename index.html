@@ -43,22 +43,23 @@
         .btn-export { background: #34c759; }
         .btn-import { background: #ff9500; }
         
-        /* CHART CONTAINER MIT SCROLL */
+        /* CHART - WIRKLICH SCROLLBAR */
         .chart-wrapper {
             margin: 16px 0;
-            padding: 10px;
             background: #f8f9fa;
             border-radius: 10px;
-            overflow-x: auto;
+            overflow-x: scroll;
             overflow-y: hidden;
             -webkit-overflow-scrolling: touch;
             position: relative;
+            scroll-behavior: smooth;
+            touch-action: pan-x;
         }
         .chart-wrapper canvas {
-            min-width: 100%;
-            width: auto;
+            display: block;
             height: 250px !important;
             max-height: 250px;
+            width: auto !important;
         }
         .chart-scroll-hint {
             text-align: center;
@@ -116,20 +117,18 @@
         <input type="number" id="gewicht" step="0.1" placeholder="Gewicht in kg">
         <button onclick="addData()">➕ Hinzufügen</button>
         
-        <!-- EXPORT -->
         <button class="btn-export" onclick="exportCSV()">📤 Export CSV</button>
         
-        <!-- IMPORT -->
         <div class="file-input-wrapper">
             <button class="btn-import" style="width:100%;">📥 Import CSV</button>
             <input type="file" id="fileInput" accept=".csv" onchange="importCSV(event)">
         </div>
         
-        <!-- CHART MIT SCROLL -->
+        <!-- CHART - WIRKLICH SCROLLBAR -->
         <div class="chart-wrapper" id="chartWrapper">
             <canvas id="weightChart"></canvas>
         </div>
-        <div class="chart-scroll-hint" id="scrollHint">← 7 Tage sichtbar • nach rechts scrollen →</div>
+        <div class="chart-scroll-hint" id="scrollHint">← scrollen für ältere Daten | 7 Tage sichtbar →</div>
         
         <button class="btn-update" onclick="appUpdate()">🔄 App Update</button>
         
@@ -222,7 +221,7 @@ function showStatus(msg, type = "info") {
 }
 
 // ============================================
-// CHART MIT SCROLL - NUR 7 TAGE SICHTBAR
+// CHART - WIRKLICH SCROLLBAR
 // ============================================
 function updateChart() {
     const data = loadData();
@@ -238,24 +237,30 @@ function updateChart() {
     
     document.getElementById('scrollHint').style.display = 'block';
     
-    // Nach Datum sortieren
+    // Sortieren nach Datum (älteste zuerst)
     const sorted = [...data].sort((a, b) => new Date(a.datum) - new Date(b.datum));
     
     const labels = sorted.map(x => x.datum);
     const values = sorted.map(x => x.gewicht);
     
-    // Chart Breite = Anzahl der Tage * 60px (mindestens aber 100%)
-    const canvas = document.getElementById('weightChart');
+    // 7 TAGE SICHTBAR = 7 * 80px
     const wrapper = document.getElementById('chartWrapper');
-    const minWidth = Math.max(labels.length * 60, wrapper.clientWidth);
-    canvas.style.width = minWidth + 'px';
+    const canvas = document.getElementById('weightChart');
+    
+    // Breite = Anzahl Tage * 80px (jeder Tag 80px breit)
+    const chartWidth = Math.max(labels.length * 80, wrapper.clientWidth);
+    canvas.style.width = chartWidth + 'px';
     canvas.style.height = '250px';
+    canvas.width = chartWidth;
+    canvas.height = 250;
     
-    const ctx = canvas.getContext('2d');
-    
+    // Chart zerstören und neu erstellen
     if (chart) {
         chart.destroy();
+        chart = null;
     }
+    
+    const ctx = canvas.getContext('2d');
     
     chart = new Chart(ctx, {
         type: 'line',
@@ -269,11 +274,12 @@ function updateChart() {
                 fill: true,
                 tension: 0.4,
                 pointBackgroundColor: '#007aff',
-                pointRadius: 4
+                pointRadius: 4,
+                pointHoverRadius: 6
             }]
         },
         options: {
-            responsive: true,
+            responsive: false,
             maintainAspectRatio: false,
             plugins: {
                 legend: {
@@ -285,13 +291,6 @@ function updateChart() {
                     beginAtZero: false,
                     grid: {
                         color: 'rgba(0,0,0,0.05)'
-                    },
-                    // Nur 7 sichtbare Werte auf Y-Achse
-                    afterTickToLabelConversion: function(scaleInstance) {
-                        const ticks = scaleInstance.ticks;
-                        if (ticks.length > 7) {
-                            scaleInstance.ticks = ticks.filter((_, i) => i % Math.ceil(ticks.length / 7) === 0);
-                        }
                     }
                 },
                 x: {
@@ -302,54 +301,17 @@ function updateChart() {
                         maxRotation: 45,
                         font: {
                             size: 10
-                        },
-                        // Nur jeden 2. Tag anzeigen wenn viele Daten
-                        autoSkip: true,
-                        maxTicksLimit: 15
+                        }
                     }
                 }
             }
-        },
-        plugins: [{
-            // Plugin für sichtbaren Bereich (7 Tage)
-            afterDraw: function(chart) {
-                const xScale = chart.scales.x;
-                const yScale = chart.scales.y;
-                
-                // Graue Linie für "7 Tage sichtbar" Bereich
-                const ctx2 = chart.ctx;
-                const dataLength = chart.data.labels.length;
-                
-                if (dataLength > 7) {
-                    // Zeige nur die letzten 7 Tage als sichtbaren Bereich
-                    const last7Index = Math.max(0, dataLength - 7);
-                    const xPos = xScale.getPixelForValue(last7Index);
-                    
-                    ctx2.save();
-                    ctx2.strokeStyle = 'rgba(0, 122, 255, 0.2)';
-                    ctx2.lineWidth = 2;
-                    ctx2.setLineDash([5, 5]);
-                    ctx2.beginPath();
-                    ctx2.moveTo(xPos, yScale.top);
-                    ctx2.lineTo(xPos, yScale.bottom);
-                    ctx2.stroke();
-                    ctx2.restore();
-                    
-                    // Scroll-Hint aktualisieren
-                    const hint = document.getElementById('scrollHint');
-                    hint.textContent = '← ' + dataLength + ' Tage • ' + (dataLength - 7) + ' Tage links verborgen →';
-                } else {
-                    const hint = document.getElementById('scrollHint');
-                    hint.textContent = '← ' + dataLength + ' Tage sichtbar →';
-                }
-            }
-        }]
+        }
     });
     
-    // Automatisch nach rechts scrollen (neueste Daten zeigen)
+    // Automatisch nach RECHTS scrollen (neueste Daten)
     setTimeout(() => {
         wrapper.scrollLeft = canvas.width - wrapper.clientWidth;
-    }, 100);
+    }, 150);
 }
 
 // ============================================
@@ -499,20 +461,6 @@ if ("serviceWorker" in navigator && window.location.protocol !== "file:") {
             .catch(() => console.log("❌ SW Fehler"));
     });
 }
-
-// ============================================
-// CHART BREITE BEI RESIZE ANPASSEN
-// ============================================
-window.addEventListener('resize', function() {
-    if (chart) {
-        const wrapper = document.getElementById('chartWrapper');
-        const canvas = document.getElementById('weightChart');
-        const data = loadData();
-        const minWidth = Math.max(data.length * 60, wrapper.clientWidth);
-        canvas.style.width = minWidth + 'px';
-        chart.resize();
-    }
-});
 
 // ============================================
 // INIT
