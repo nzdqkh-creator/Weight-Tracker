@@ -39,6 +39,8 @@
         }
         button:active { opacity: 0.7; }
         .btn-update { background: #ff3b30; }
+        .btn-export { background: #34c759; }
+        .btn-import { background: #ff9500; }
         table { width: 100%; margin-top: 16px; font-size: 15px; }
         th { text-align: left; padding: 8px 0; border-bottom: 2px solid #ddd; }
         td { padding: 8px 0; border-bottom: 1px solid #eee; }
@@ -63,6 +65,24 @@
             padding: 0 8px;
             width: auto;
         }
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            width: 100%;
+        }
+        .file-input-wrapper input[type=file] {
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+        .btn-import-wrapper {
+            width: 100%;
+        }
     </style>
 </head>
 <body>
@@ -72,6 +92,16 @@
         <input type="date" id="datum">
         <input type="number" id="gewicht" step="0.1" placeholder="Gewicht in kg">
         <button onclick="addData()">➕ Hinzufügen</button>
+        
+        <!-- EXPORT BUTTON -->
+        <button class="btn-export" onclick="exportCSV()">📤 Export CSV</button>
+        
+        <!-- IMPORT BUTTON -->
+        <div class="file-input-wrapper">
+            <button class="btn-import" style="width:100%;">📥 Import CSV</button>
+            <input type="file" id="fileInput" accept=".csv" onchange="importCSV(event)">
+        </div>
+        
         <button class="btn-update" onclick="appUpdate()">🔄 App Update</button>
         
         <div id="status" class="status"></div>
@@ -136,7 +166,6 @@ function addData() {
     showStatus("✅ Hinzugefügt", "success");
 }
 
-// EINZELNE ZEILE LÖSCHEN
 function deleteRow(index) {
     if (!confirm("Diese Zeile löschen?")) return;
     const data = loadData();
@@ -154,7 +183,86 @@ function showStatus(msg, type = "info") {
 }
 
 // ============================================
-// APP UPDATE - NUR BACKUP + COOKIES + RELOAD
+// EXPORT CSV
+// ============================================
+function exportCSV() {
+    const daten = loadData();
+    
+    if (daten.length === 0) {
+        showStatus("❌ Keine Daten zum Exportieren", "error");
+        return;
+    }
+    
+    let csv = "Datum,Gewicht kg\n";
+    daten.forEach(x => csv += x.datum + "," + x.gewicht + "\n");
+    
+    const blob = new Blob([csv], { type: "text/csv" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "Gewicht_Export_" + new Date().toISOString().split('T')[0] + ".csv";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+    
+    showStatus("✅ " + daten.length + " Zeilen exportiert", "success");
+}
+
+// ============================================
+// IMPORT CSV
+// ============================================
+function importCSV(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const text = e.target.result;
+            const lines = text.split("\n").filter(line => line.trim() !== "");
+            
+            if (lines.length < 2) {
+                showStatus("❌ CSV enthält keine Daten", "error");
+                return;
+            }
+            
+            // Header überspringen (erste Zeile)
+            const data = [];
+            for (let i = 1; i < lines.length; i++) {
+                const parts = lines[i].split(",");
+                if (parts.length >= 2) {
+                    const datum = parts[0].trim();
+                    const gewicht = parseFloat(parts[1].trim());
+                    if (datum && !isNaN(gewicht)) {
+                        data.push({ datum, gewicht });
+                    }
+                }
+            }
+            
+            if (data.length === 0) {
+                showStatus("❌ Keine gültigen Daten gefunden", "error");
+                return;
+            }
+            
+            // Vorhandene Daten laden und ergänzen
+            const existingData = loadData();
+            const allData = [...existingData, ...data];
+            saveData(allData);
+            
+            showStatus("✅ " + data.length + " Zeilen importiert", "success");
+            
+        } catch (err) {
+            showStatus("❌ Fehler beim Import: " + err.message, "error");
+        }
+    };
+    reader.readAsText(file);
+    
+    // Input zurücksetzen für erneuten Import gleicher Datei
+    event.target.value = "";
+}
+
+// ============================================
+// APP UPDATE
 // ============================================
 function appUpdate() {
     if (!confirm("Backup erstellen und App aktualisieren?")) return;
@@ -162,9 +270,7 @@ function appUpdate() {
     try {
         const daten = loadData();
         
-        // ============================================
-        // 1. EXPORT ALS CSV
-        // ============================================
+        // Backup CSV
         let csv = "Datum,Gewicht kg\n";
         daten.forEach(x => csv += x.datum + "," + x.gewicht + "\n");
         
@@ -179,9 +285,6 @@ function appUpdate() {
         
         showStatus("📥 Backup erstellt", "info");
         
-        // ============================================
-        // 2. WARTEN BIS DOWNLOAD FERTIG
-        // ============================================
         setTimeout(async () => {
             try {
                 // ALLE COOKIES LÖSCHEN
@@ -189,13 +292,9 @@ function appUpdate() {
                     document.cookie = c.split("=")[0] + "=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
                 });
                 
-                // LOCALSTORAGE LÖSCHEN
                 localStorage.clear();
-                
-                // SESSIONSTORAGE LÖSCHEN
                 sessionStorage.clear();
                 
-                // CACHE LÖSCHEN
                 if ("caches" in window) {
                     try {
                         const keys = await caches.keys();
@@ -205,7 +304,6 @@ function appUpdate() {
                     } catch (e) {}
                 }
                 
-                // SERVICE WORKER LÖSCHEN
                 if ("serviceWorker" in navigator && window.location.protocol !== "file:") {
                     try {
                         const regs = await navigator.serviceWorker.getRegistrations();
@@ -215,7 +313,6 @@ function appUpdate() {
                     } catch (e) {}
                 }
                 
-                // SEITE NEU LADEN
                 window.location.reload(true);
                 
             } catch (e) {
@@ -229,7 +326,7 @@ function appUpdate() {
 }
 
 // ============================================
-// SERVICE WORKER REGISTRIEREN
+// SERVICE WORKER
 // ============================================
 if ("serviceWorker" in navigator && window.location.protocol !== "file:") {
     window.addEventListener("load", () => {
