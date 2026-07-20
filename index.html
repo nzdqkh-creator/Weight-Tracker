@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="manifest" href="manifest.json">
     <title>Gewichtstracker</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -37,10 +38,23 @@
         }
         button:active { opacity: 0.7; }
         .btn-update { background: #ff3b30; }
-        .btn-reset { background: #8e8e93; }
+        .btn-export { background: #34c759; }
+        .btn-import { background: #ff9500; }
         table { width: 100%; margin-top: 16px; font-size: 15px; }
         th { text-align: left; padding: 8px 0; border-bottom: 2px solid #ddd; }
         td { padding: 8px 0; border-bottom: 1px solid #eee; }
+        .delete-btn {
+            background: #ff3b30;
+            color: white;
+            border: none;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            width: auto;
+            margin: 0;
+        }
+        .delete-btn:active { opacity: 0.7; }
         .empty { text-align: center; padding: 30px 0; color: #999; }
         .status {
             padding: 12px;
@@ -53,6 +67,18 @@
         .status.success { background: #d4edda; color: #155724; }
         .status.error { background: #f8d7da; color: #721c24; }
         .status.info { background: #d1ecf1; color: #0c5460; }
+        .hidden { display: none; }
+        .button-row {
+            display: flex;
+            gap: 8px;
+        }
+        .button-row button {
+            flex: 1;
+            margin-bottom: 10px;
+        }
+        #fileInput {
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -62,14 +88,20 @@
         <input type="date" id="datum">
         <input type="number" id="gewicht" step="0.1" placeholder="Gewicht in kg">
         <button onclick="addData()">➕ Hinzufügen</button>
-        <button class="btn-update" onclick="appUpdate()">🔄 App Update</button>
-        <button class="btn-reset" onclick="resetData()">🗑️ Alle löschen</button>
+        
+        <div class="button-row">
+            <button class="btn-export" onclick="exportData()">📤 Export</button>
+            <button class="btn-import" onclick="document.getElementById('fileInput').click()">📥 Import</button>
+            <button class="btn-update" onclick="appUpdate()">🔄 Update</button>
+        </div>
+        
+        <input type="file" id="fileInput" accept=".json" onchange="importData(event)">
         
         <div id="status" class="status"></div>
         
         <div id="tableContainer">
             <table>
-                <thead><tr><th>Datum</th><th>kg</th></tr></thead>
+                <thead><tr><th>Datum</th><th>kg</th><th></th></tr></thead>
                 <tbody id="dataBody"></tbody>
             </table>
             <div id="emptyState" class="empty">📭 Keine Daten</div>
@@ -77,6 +109,9 @@
     </div>
 
 <script>
+// ============================================
+// DATEN VERWALTEN
+// ============================================
 function loadData() {
     try { return JSON.parse(localStorage.getItem("gewichtDaten") || "[]"); } 
     catch { return []; }
@@ -99,11 +134,29 @@ function render() {
     }
     
     empty.style.display = "none";
-    tbody.innerHTML = data.map(x => 
-        `<tr><td>${x.datum}</td><td>${x.gewicht}</td></tr>`
+    tbody.innerHTML = data.map((x, index) => 
+        `<tr>
+            <td>${x.datum}</td>
+            <td>${x.gewicht}</td>
+            <td><button class="delete-btn" onclick="deleteRow(${index})">✕</button></td>
+        </tr>`
     ).join("");
 }
 
+// ============================================
+// EINZELNE ZEILE LÖSCHEN
+// ============================================
+function deleteRow(index) {
+    if (!confirm("Diese Zeile löschen?")) return;
+    const data = loadData();
+    data.splice(index, 1);
+    saveData(data);
+    showStatus("🗑️ Gelöscht", "info");
+}
+
+// ============================================
+// DATEN HINZUFÜGEN
+// ============================================
 function addData() {
     const datum = document.getElementById("datum").value;
     const gewicht = document.getElementById("gewicht").value;
@@ -120,13 +173,56 @@ function addData() {
     showStatus("✅ Hinzugefügt", "success");
 }
 
-function resetData() {
-    if (!confirm("Alle Daten löschen?")) return;
-    localStorage.removeItem("gewichtDaten");
-    render();
-    showStatus("🗑️ Gelöscht", "info");
+// ============================================
+// EXPORT
+// ============================================
+function exportData() {
+    const data = loadData();
+    if (data.length === 0) {
+        showStatus("Keine Daten zum Exportieren", "error");
+        return;
+    }
+    
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "gewichtsdaten_" + new Date().toISOString().split('T')[0] + ".json";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+    showStatus("📤 Exportiert", "success");
 }
 
+// ============================================
+// IMPORT
+// ============================================
+function importData(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = JSON.parse(e.target.result);
+            if (!Array.isArray(data)) {
+                showStatus("❌ Ungültiges Format", "error");
+                return;
+            }
+            saveData(data);
+            showStatus("📥 Importiert: " + data.length + " Einträge", "success");
+        } catch (err) {
+            showStatus("❌ Fehler beim Import: " + err.message, "error");
+        }
+    };
+    reader.readAsText(file);
+    event.target.value = "";
+}
+
+// ============================================
+// STATUS
+// ============================================
 function showStatus(msg, type = "info") {
     const el = document.getElementById("status");
     el.textContent = msg;
@@ -136,7 +232,7 @@ function showStatus(msg, type = "info") {
 }
 
 // ============================================
-// APP UPDATE - FEHLERFREI
+// APP UPDATE
 // ============================================
 function appUpdate() {
     if (!confirm("Backup erstellen und App aktualisieren?")) return;
@@ -161,42 +257,32 @@ function appUpdate() {
         
         setTimeout(async () => {
             try {
-                // 1. ALLE COOKIES LÖSCHEN
+                // Cookies löschen
                 document.cookie.split(";").forEach(c => {
                     document.cookie = c.split("=")[0] + "=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
                 });
                 
-                // 2. LOCALSTORAGE LÖSCHEN
                 localStorage.clear();
-                
-                // 3. SESSIONSTORAGE LÖSCHEN
                 sessionStorage.clear();
                 
-                // 4. CACHE LÖSCHEN (NUR WENN VERFÜGBAR)
                 if ("caches" in window) {
                     try {
                         const keys = await caches.keys();
                         for (const key of keys) {
                             await caches.delete(key);
                         }
-                    } catch (e) {
-                        console.log("Cache nicht verfügbar");
-                    }
+                    } catch (e) {}
                 }
                 
-                // 5. SERVICE WORKER LÖSCHEN (NUR BEI HTTPS)
                 if ("serviceWorker" in navigator && window.location.protocol !== "file:") {
                     try {
                         const regs = await navigator.serviceWorker.getRegistrations();
                         for (const reg of regs) {
                             await reg.unregister();
                         }
-                    } catch (e) {
-                        console.log("Service Worker nicht verfügbar");
-                    }
+                    } catch (e) {}
                 }
                 
-                // 6. SEITE NEU LADEN
                 window.location.reload(true);
                 
             } catch (e) {
@@ -209,7 +295,18 @@ function appUpdate() {
     }
 }
 
+// ============================================
+// SERVICE WORKER REGISTRIEREN
+// ============================================
+if ("serviceWorker" in navigator && window.location.protocol !== "file:") {
+    window.addEventListener("load", () => {
+        navigator.serviceWorker.register("service-worker.js").catch(() => {});
+    });
+}
+
+// ============================================
 // INIT
+// ============================================
 document.addEventListener("DOMContentLoaded", function() {
     const heute = new Date().toISOString().split('T')[0];
     document.getElementById("datum").value = heute;
