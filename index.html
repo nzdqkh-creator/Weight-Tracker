@@ -42,13 +42,31 @@
         .btn-update { background: #ff3b30; }
         .btn-export { background: #34c759; }
         .btn-import { background: #ff9500; }
-        .chart-container {
+        
+        /* CHART CONTAINER MIT SCROLL */
+        .chart-wrapper {
             margin: 16px 0;
             padding: 10px;
             background: #f8f9fa;
             border-radius: 10px;
-            height: 250px;
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+            position: relative;
         }
+        .chart-wrapper canvas {
+            min-width: 100%;
+            width: auto;
+            height: 250px !important;
+            max-height: 250px;
+        }
+        .chart-scroll-hint {
+            text-align: center;
+            font-size: 12px;
+            color: #999;
+            padding: 4px 0;
+        }
+        
         table { width: 100%; margin-top: 16px; font-size: 15px; }
         th { text-align: left; padding: 8px 0; border-bottom: 2px solid #ddd; }
         td { padding: 8px 0; border-bottom: 1px solid #eee; }
@@ -107,10 +125,11 @@
             <input type="file" id="fileInput" accept=".csv" onchange="importCSV(event)">
         </div>
         
-        <!-- CHART -->
-        <div class="chart-container">
+        <!-- CHART MIT SCROLL -->
+        <div class="chart-wrapper" id="chartWrapper">
             <canvas id="weightChart"></canvas>
         </div>
+        <div class="chart-scroll-hint" id="scrollHint">← 7 Tage sichtbar • nach rechts scrollen →</div>
         
         <button class="btn-update" onclick="appUpdate()">🔄 App Update</button>
         
@@ -157,7 +176,6 @@ function render() {
     }
     
     empty.style.display = "none";
-    // Sortieren nach Datum (älteste zuerst für Tabelle)
     const sorted = [...data].sort((a, b) => new Date(a.datum) - new Date(b.datum));
     tbody.innerHTML = sorted.map((x, index) => 
         `<tr>
@@ -204,7 +222,7 @@ function showStatus(msg, type = "info") {
 }
 
 // ============================================
-// CHART
+// CHART MIT SCROLL - NUR 7 TAGE SICHTBAR
 // ============================================
 function updateChart() {
     const data = loadData();
@@ -214,16 +232,26 @@ function updateChart() {
             chart.destroy();
             chart = null;
         }
+        document.getElementById('scrollHint').style.display = 'none';
         return;
     }
     
-    // Nach Datum sortieren (für Chart)
+    document.getElementById('scrollHint').style.display = 'block';
+    
+    // Nach Datum sortieren
     const sorted = [...data].sort((a, b) => new Date(a.datum) - new Date(b.datum));
     
     const labels = sorted.map(x => x.datum);
     const values = sorted.map(x => x.gewicht);
     
-    const ctx = document.getElementById('weightChart').getContext('2d');
+    // Chart Breite = Anzahl der Tage * 60px (mindestens aber 100%)
+    const canvas = document.getElementById('weightChart');
+    const wrapper = document.getElementById('chartWrapper');
+    const minWidth = Math.max(labels.length * 60, wrapper.clientWidth);
+    canvas.style.width = minWidth + 'px';
+    canvas.style.height = '250px';
+    
+    const ctx = canvas.getContext('2d');
     
     if (chart) {
         chart.destroy();
@@ -257,6 +285,13 @@ function updateChart() {
                     beginAtZero: false,
                     grid: {
                         color: 'rgba(0,0,0,0.05)'
+                    },
+                    // Nur 7 sichtbare Werte auf Y-Achse
+                    afterTickToLabelConversion: function(scaleInstance) {
+                        const ticks = scaleInstance.ticks;
+                        if (ticks.length > 7) {
+                            scaleInstance.ticks = ticks.filter((_, i) => i % Math.ceil(ticks.length / 7) === 0);
+                        }
                     }
                 },
                 x: {
@@ -267,12 +302,54 @@ function updateChart() {
                         maxRotation: 45,
                         font: {
                             size: 10
-                        }
+                        },
+                        // Nur jeden 2. Tag anzeigen wenn viele Daten
+                        autoSkip: true,
+                        maxTicksLimit: 15
                     }
                 }
             }
-        }
+        },
+        plugins: [{
+            // Plugin für sichtbaren Bereich (7 Tage)
+            afterDraw: function(chart) {
+                const xScale = chart.scales.x;
+                const yScale = chart.scales.y;
+                
+                // Graue Linie für "7 Tage sichtbar" Bereich
+                const ctx2 = chart.ctx;
+                const dataLength = chart.data.labels.length;
+                
+                if (dataLength > 7) {
+                    // Zeige nur die letzten 7 Tage als sichtbaren Bereich
+                    const last7Index = Math.max(0, dataLength - 7);
+                    const xPos = xScale.getPixelForValue(last7Index);
+                    
+                    ctx2.save();
+                    ctx2.strokeStyle = 'rgba(0, 122, 255, 0.2)';
+                    ctx2.lineWidth = 2;
+                    ctx2.setLineDash([5, 5]);
+                    ctx2.beginPath();
+                    ctx2.moveTo(xPos, yScale.top);
+                    ctx2.lineTo(xPos, yScale.bottom);
+                    ctx2.stroke();
+                    ctx2.restore();
+                    
+                    // Scroll-Hint aktualisieren
+                    const hint = document.getElementById('scrollHint');
+                    hint.textContent = '← ' + dataLength + ' Tage • ' + (dataLength - 7) + ' Tage links verborgen →';
+                } else {
+                    const hint = document.getElementById('scrollHint');
+                    hint.textContent = '← ' + dataLength + ' Tage sichtbar →';
+                }
+            }
+        }]
     });
+    
+    // Automatisch nach rechts scrollen (neueste Daten zeigen)
+    setTimeout(() => {
+        wrapper.scrollLeft = canvas.width - wrapper.clientWidth;
+    }, 100);
 }
 
 // ============================================
@@ -422,6 +499,20 @@ if ("serviceWorker" in navigator && window.location.protocol !== "file:") {
             .catch(() => console.log("❌ SW Fehler"));
     });
 }
+
+// ============================================
+// CHART BREITE BEI RESIZE ANPASSEN
+// ============================================
+window.addEventListener('resize', function() {
+    if (chart) {
+        const wrapper = document.getElementById('chartWrapper');
+        const canvas = document.getElementById('weightChart');
+        const data = loadData();
+        const minWidth = Math.max(data.length * 60, wrapper.clientWidth);
+        canvas.style.width = minWidth + 'px';
+        chart.resize();
+    }
+});
 
 // ============================================
 // INIT
