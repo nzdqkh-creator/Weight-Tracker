@@ -43,7 +43,6 @@
         .btn-export { background: #34c759; }
         .btn-import { background: #ff9500; }
         
-        /* CHART - WIRKLICH SCROLLBAR */
         .chart-wrapper {
             margin: 16px 0;
             background: #f8f9fa;
@@ -57,8 +56,8 @@
         }
         .chart-wrapper canvas {
             display: block;
-            height: 250px !important;
-            max-height: 250px;
+            height: 280px !important;
+            max-height: 280px;
             width: auto !important;
         }
         .chart-scroll-hint {
@@ -124,7 +123,6 @@
             <input type="file" id="fileInput" accept=".csv" onchange="importCSV(event)">
         </div>
         
-        <!-- CHART - WIRKLICH SCROLLBAR -->
         <div class="chart-wrapper" id="chartWrapper">
             <canvas id="weightChart"></canvas>
         </div>
@@ -221,7 +219,7 @@ function showStatus(msg, type = "info") {
 }
 
 // ============================================
-// CHART - WIRKLICH SCROLLBAR
+// CHART - MIT DATENPUNKTEN (WERTEN)
 // ============================================
 function updateChart() {
     const data = loadData();
@@ -237,24 +235,21 @@ function updateChart() {
     
     document.getElementById('scrollHint').style.display = 'block';
     
-    // Sortieren nach Datum (älteste zuerst)
     const sorted = [...data].sort((a, b) => new Date(a.datum) - new Date(b.datum));
     
     const labels = sorted.map(x => x.datum);
     const values = sorted.map(x => x.gewicht);
     
-    // 7 TAGE SICHTBAR = 7 * 80px
     const wrapper = document.getElementById('chartWrapper');
     const canvas = document.getElementById('weightChart');
     
-    // Breite = Anzahl Tage * 80px (jeder Tag 80px breit)
+    // Breite = Anzahl Tage * 80px
     const chartWidth = Math.max(labels.length * 80, wrapper.clientWidth);
     canvas.style.width = chartWidth + 'px';
-    canvas.style.height = '250px';
+    canvas.style.height = '280px';
     canvas.width = chartWidth;
-    canvas.height = 250;
+    canvas.height = 280;
     
-    // Chart zerstören und neu erstellen
     if (chart) {
         chart.destroy();
         chart = null;
@@ -274,8 +269,10 @@ function updateChart() {
                 fill: true,
                 tension: 0.4,
                 pointBackgroundColor: '#007aff',
-                pointRadius: 4,
-                pointHoverRadius: 6
+                pointRadius: 6,
+                pointHoverRadius: 8,
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2
             }]
         },
         options: {
@@ -284,6 +281,14 @@ function updateChart() {
             plugins: {
                 legend: {
                     display: false
+                },
+                // DATENWERTE ANZEIGEN ÜBER PUNKTEN
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.parsed.y + ' kg';
+                        }
+                    }
                 }
             },
             scales: {
@@ -291,6 +296,11 @@ function updateChart() {
                     beginAtZero: false,
                     grid: {
                         color: 'rgba(0,0,0,0.05)'
+                    },
+                    ticks: {
+                        callback: function(value) {
+                            return value + ' kg';
+                        }
                     }
                 },
                 x: {
@@ -305,7 +315,55 @@ function updateChart() {
                     }
                 }
             }
-        }
+        },
+        plugins: [{
+            // DATENWERTE ÜBER DEN PUNKTEN ANZEIGEN
+            afterDraw: function(chart) {
+                const ctx2 = chart.ctx;
+                const xAxis = chart.scales.x;
+                const yAxis = chart.scales.y;
+                const dataset = chart.data.datasets[0];
+                const data = dataset.data;
+                
+                ctx2.save();
+                
+                data.forEach((value, index) => {
+                    const x = xAxis.getPixelForValue(index);
+                    const y = yAxis.getPixelForValue(value);
+                    
+                    // Wert mit einer Zahl nach dem Komma
+                    const displayValue = value % 1 === 0 ? value : value.toFixed(1);
+                    
+                    // Hintergrund für bessere Lesbarkeit
+                    ctx2.font = 'bold 12px -apple-system, sans-serif';
+                    ctx2.textAlign = 'center';
+                    ctx2.textBaseline = 'bottom';
+                    
+                    // Weißer Hintergrund für Text
+                    const text = displayValue + ' kg';
+                    const metrics = ctx2.measureText(text);
+                    const textWidth = metrics.width;
+                    const textHeight = 16;
+                    const padding = 4;
+                    
+                    // Halbtransparenter Hintergrund
+                    ctx2.fillStyle = 'rgba(255, 255, 255, 0.85)';
+                    ctx2.roundRect 
+                        ? ctx2.roundRect(x - textWidth/2 - padding, y - 28, textWidth + padding*2, textHeight + padding*2, 4)
+                        : ctx2.rect(x - textWidth/2 - padding, y - 28, textWidth + padding*2, textHeight + padding*2);
+                    ctx2.fill();
+                    
+                    // Text
+                    ctx2.fillStyle = '#007aff';
+                    ctx2.font = 'bold 11px -apple-system, sans-serif';
+                    ctx2.textAlign = 'center';
+                    ctx2.textBaseline = 'bottom';
+                    ctx2.fillText(text, x, y - 6);
+                });
+                
+                ctx2.restore();
+            }
+        }]
     });
     
     // Automatisch nach RECHTS scrollen (neueste Daten)
