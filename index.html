@@ -1,538 +1,223 @@
 <!DOCTYPE html>
 <html lang="de">
-
 <head>
-
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<title>Gewicht Tracker</title>
-
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#2b7cff">
-<link rel="icon" href="icon.png">
-
-<style>
-
-body {
-    font-family: Arial, sans-serif;
-    margin: 0;
-    padding: 15px;
-    background: #f2f2f2;
-}
-
-.container {
-    max-width: 500px;
-    margin: auto;
-    background: white;
-    padding: 15px;
-    border-radius: 15px;
-}
-
-h1 {
-    text-align: center;
-}
-
-canvas {
-    width: 100%;
-    height: 250px;
-    border: 1px solid #ddd;
-    margin-top: 10px;
-    border-radius: 8px;
-    background: #fafafa;
-}
-
-input {
-    font-size: 20px;
-    padding: 12px;
-    border: 1px solid #ccc;
-    border-radius: 8px;
-    box-sizing: border-box;
-}
-
-input[type="number"] {
-    width: 60%;
-}
-
-input[type="date"] {
-    width: 35%;
-}
-
-button {
-    width: 100%;
-    margin-top: 10px;
-    padding: 14px;
-    font-size: 18px;
-    border-radius: 10px;
-    border: none;
-    background: #333;
-    color: white;
-    cursor: pointer;
-}
-
-button:hover {
-    opacity: 0.8;
-}
-
-table {
-    width:100%;
-    margin-top:20px;
-    border-collapse:collapse;
-}
-
-th,td {
-    border-bottom:1px solid #ddd;
-    padding:10px;
-    text-align:center;
-}
-
-.delete {
-    background:#aa0000;
-    padding: 6px 12px;
-    border-radius: 5px;
-    border: none;
-    color: white;
-    cursor: pointer;
-    width: auto;
-}
-
-.delete:hover {
-    opacity: 0.8;
-}
-
-</style>
-
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Gewichtstracker</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, sans-serif;
+            background: #f5f5f5;
+            padding: 12px;
+            max-width: 480px;
+            margin: 0 auto;
+        }
+        .container {
+            background: white;
+            border-radius: 16px;
+            padding: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h1 { font-size: 22px; margin-bottom: 16px; color: #333; }
+        input, button {
+            width: 100%;
+            padding: 14px;
+            font-size: 16px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            margin-bottom: 10px;
+        }
+        button {
+            background: #007aff;
+            color: white;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        button:active { opacity: 0.7; }
+        .btn-update { background: #ff3b30; }
+        .btn-reset { background: #8e8e93; }
+        table { width: 100%; margin-top: 16px; font-size: 15px; }
+        th { text-align: left; padding: 8px 0; border-bottom: 2px solid #ddd; }
+        td { padding: 8px 0; border-bottom: 1px solid #eee; }
+        .empty { text-align: center; padding: 30px 0; color: #999; }
+        .status {
+            padding: 12px;
+            border-radius: 10px;
+            margin: 10px 0;
+            display: none;
+            font-size: 14px;
+        }
+        .status.show { display: block; }
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .status.info { background: #d1ecf1; color: #0c5460; }
+    </style>
 </head>
-
 <body>
-
-<div class="container">
-
-<h1>⚖️ Gewicht0</h1>
-
-<h3>Entwicklung</h3>
-
-<canvas id="chart"
-width="450"
-height="250">
-</canvas>
-
-<h3>Neuer Eintrag</h3>
-
-<div style="display: flex; gap: 10px; margin-top: 10px;">
-<input 
-id="gewicht"
-type="number"
-step="0.1"
-placeholder="kg">
-
-<input 
-id="datum"
-type="date">
-</div>
-
-<button onclick="speichern()">
-Speichern
-</button>
-
-<button onclick="exportieren()">
-📥 Export (CSV)
-</button>
-
-<button onclick="importieren()">
-📤 Import (CSV)
-</button>
-
-<h3>Daten</h3>
-
-<table>
-
-<thead>
-
-<tr>
-<th>Datum</th>
-<th>Gewicht</th>
-<th></th>
-</tr>
-
-</thead>
-
-<tbody id="tabelle">
-
-</tbody>
-
-</table>
-
-</div>
+    <div class="container">
+        <h1>📊 Gewicht</h1>
+        
+        <input type="date" id="datum">
+        <input type="number" id="gewicht" step="0.1" placeholder="Gewicht in kg">
+        <button onclick="addData()">➕ Hinzufügen</button>
+        <button class="btn-update" onclick="appUpdate()">🔄 App Update</button>
+        <button class="btn-reset" onclick="resetData()">🗑️ Alle löschen</button>
+        
+        <div id="status" class="status"></div>
+        
+        <div id="tableContainer">
+            <table>
+                <thead><tr><th>Datum</th><th>kg</th></tr></thead>
+                <tbody id="dataBody"></tbody>
+            </table>
+            <div id="emptyState" class="empty">📭 Keine Daten</div>
+        </div>
+    </div>
 
 <script>
-
-let daten =
-JSON.parse(localStorage.getItem("gewichtDaten"))
-|| [];
-
-// Heutiges Datum als Standardwert
-document.getElementById("datum").valueAsDate = new Date();
-
-function speichern(){
-
-let gewichtFeld =
-document.getElementById("gewicht");
-
-let datumFeld =
-document.getElementById("datum");
-
-let wert =
-Number(gewichtFeld.value);
-
-let datum =
-datumFeld.value;
-
-if(!wert){
-
-alert("Bitte Gewicht eingeben");
-
-return;
-
+function loadData() {
+    try { return JSON.parse(localStorage.getItem("gewichtDaten") || "[]"); } 
+    catch { return []; }
 }
 
-if(!datum){
-
-alert("Bitte Datum auswählen");
-
-return;
-
+function saveData(data) {
+    localStorage.setItem("gewichtDaten", JSON.stringify(data));
+    render();
 }
 
-// Datum formatieren (DD.MM.YYYY)
-let datumParts = datum.split("-");
-let formatiertesDatum = datumParts[2] + "." + datumParts[1] + "." + datumParts[0];
-
-daten.push({
-
-datum: formatiertesDatum,
-gewicht: wert,
-datumRaw: datum
-
-});
-
-localStorage.setItem(
-"gewichtDaten",
-JSON.stringify(daten)
-);
-
-gewichtFeld.value="";
-datumFeld.valueAsDate = new Date();
-
-anzeigen();
-
-}
-
-function anzeigen(){
-
-let tabelle =
-document.getElementById("tabelle");
-
-tabelle.innerHTML="";
-
-// Sortieren nach Datum
-daten.sort((a,b) => {
-    if(a.datumRaw < b.datumRaw) return -1;
-    if(a.datumRaw > b.datumRaw) return 1;
-    return 0;
-});
-
-daten.forEach((eintrag,index)=>{
-
-tabelle.innerHTML += `
-
-<tr>
-
-<td>${eintrag.datum}</td>
-
-<td>${eintrag.gewicht} kg</td>
-
-<td>
-
-<button class="delete"
-onclick="loeschen(${index})">
-X
-</button>
-
-</td>
-
-</tr>
-
-`;
-
-});
-
-zeichnen();
-
-}
-
-function loeschen(index){
-
-if(confirm("Eintrag wirklich löschen?")) {
-    daten.splice(index,1);
-
-    localStorage.setItem(
-    "gewichtDaten",
-    JSON.stringify(daten)
-    );
-
-    anzeigen();
-}
-
-}
-
-function exportieren(){
-
-if(daten.length === 0) {
-    alert("Keine Daten zum Exportieren");
-    return;
-}
-
-let csv =
-"Datum,Gewicht kg\n";
-
-daten.forEach(x=>{
-
-csv +=
-x.datum + "," +
-x.gewicht +
-"\n";
-
-});
-
-let blob =
-new Blob(
-[csv],
-{
-type:"text/csv"
-}
-);
-
-let link =
-document.createElement("a");
-
-link.href =
-URL.createObjectURL(blob);
-
-link.download =
-"Gewicht_Tracker.csv";
-
-link.click();
-
-}
-
-function importieren(){
-
-let input = document.createElement('input');
-input.type = 'file';
-input.accept = '.csv';
-
-input.onchange = function(e) {
-    let file = e.target.files[0];
-    let reader = new FileReader();
+function render() {
+    const data = loadData();
+    const tbody = document.getElementById("dataBody");
+    const empty = document.getElementById("emptyState");
     
-    reader.onload = function(event) {
-        let text = event.target.result;
-        let lines = text.split('\n');
-        
-        // Erste Zeile überspringen (Header)
-        for(let i = 1; i < lines.length; i++) {
-            if(lines[i].trim() === '') continue;
-            
-            let parts = lines[i].split(',');
-            if(parts.length >= 2) {
-                let datum = parts[0].trim();
-                let gewicht = parseFloat(parts[1].trim());
-                
-                if(!isNaN(gewicht) && datum) {
-                    // Datum in raw format umwandeln
-                    let datumParts = datum.split('.');
-                    let datumRaw = datumParts[2] + '-' + datumParts[1] + '-' + datumParts[0];
-                    
-                    daten.push({
-                        datum: datum,
-                        gewicht: gewicht,
-                        datumRaw: datumRaw
-                    });
-                }
-            }
-        }
-        
-        localStorage.setItem(
-            "gewichtDaten",
-            JSON.stringify(daten)
-        );
-        
-        anzeigen();
-        alert("Import erfolgreich!");
-    };
-    
-    reader.readAsText(file);
-};
-
-input.click();
-
-}
-
-// Glatte Kurve mit Catmull-Rom Spline
-function zeichneGlatteKurve(ctx, punkte) {
-    if(punkte.length < 2) return;
-    
-    ctx.beginPath();
-    ctx.moveTo(punkte[0].x, punkte[0].y);
-    
-    for(let i = 0; i < punkte.length - 1; i++) {
-        let p0 = punkte[i];
-        let p1 = punkte[i + 1];
-        
-        // Kontrollpunkte für glatte Kurve
-        let cp1x, cp1y, cp2x, cp2y;
-        
-        if(i === 0) {
-            // Erster Punkt
-            cp1x = p0.x + (p1.x - p0.x) * 0.25;
-            cp1y = p0.y;
-            cp2x = p1.x - (p1.x - p0.x) * 0.25;
-            cp2y = p1.y;
-        } else if(i === punkte.length - 2) {
-            // Letzter Punkt
-            let pPrev = punkte[i - 1];
-            cp1x = p0.x + (p1.x - pPrev.x) * 0.25;
-            cp1y = p0.y;
-            cp2x = p1.x - (p1.x - pPrev.x) * 0.25;
-            cp2y = p1.y;
-        } else {
-            let pPrev = punkte[i - 1];
-            let pNext = punkte[i + 2];
-            cp1x = p0.x + (p1.x - pPrev.x) * 0.25;
-            cp1y = p0.y;
-            cp2x = p1.x - (pNext.x - p0.x) * 0.25;
-            cp2y = p1.y;
-        }
-        
-        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p1.x, p1.y);
+    if (data.length === 0) {
+        tbody.innerHTML = "";
+        empty.style.display = "block";
+        return;
     }
     
-    ctx.stroke();
+    empty.style.display = "none";
+    tbody.innerHTML = data.map(x => 
+        `<tr><td>${x.datum}</td><td>${x.gewicht}</td></tr>`
+    ).join("");
 }
 
-function zeichnen(){
-
-let canvas =
-document.getElementById("chart");
-
-let ctx =
-canvas.getContext("2d");
-
-let width = canvas.width;
-let height = canvas.height;
-
-ctx.clearRect(
-0,
-0,
-width,
-height
-);
-
-if(daten.length < 2)
-return;
-
-let min =
-Math.min(...daten.map(x=>x.gewicht))-1;
-
-let max =
-Math.max(...daten.map(x=>x.gewicht))+1;
-
-// Hintergrund-Gitter
-ctx.strokeStyle = "#e0e0e0";
-ctx.lineWidth = 1;
-
-for(let i = 0; i <= 5; i++) {
-    let yPos = 30 + i * ((height-60) / 5);
-    ctx.beginPath();
-    ctx.moveTo(40, yPos);
-    ctx.lineTo(width-20, yPos);
-    ctx.stroke();
+function addData() {
+    const datum = document.getElementById("datum").value;
+    const gewicht = document.getElementById("gewicht").value;
     
-    // Werte am Rand
-    let value = max - (i * ((max-min) / 5));
-    ctx.fillStyle = "#666";
-    ctx.font = "10px Arial";
-    ctx.textAlign = "right";
-    ctx.fillText(Math.round(value * 10) / 10, 35, yPos + 4);
+    if (!datum || !gewicht || gewicht <= 0) {
+        showStatus("Bitte Datum und Gewicht eingeben", "error");
+        return;
+    }
+    
+    const data = loadData();
+    data.push({ datum, gewicht: parseFloat(gewicht) });
+    saveData(data);
+    document.getElementById("gewicht").value = "";
+    showStatus("✅ Hinzugefügt", "success");
 }
 
-// Punkte für die Kurve sammeln
-let punkte = [];
+function resetData() {
+    if (!confirm("Alle Daten löschen?")) return;
+    localStorage.removeItem("gewichtDaten");
+    render();
+    showStatus("🗑️ Gelöscht", "info");
+}
 
-daten.forEach((x,i)=>{
+function showStatus(msg, type = "info") {
+    const el = document.getElementById("status");
+    el.textContent = msg;
+    el.className = "status show " + type;
+    clearTimeout(el._timeout);
+    el._timeout = setTimeout(() => el.className = "status", 4000);
+}
 
-let xpos =
-40 +
-i *
-((width-60) /
-(daten.length-1));
+// ============================================
+// APP UPDATE - FEHLERFREI
+// ============================================
+function appUpdate() {
+    if (!confirm("Backup erstellen und App aktualisieren?")) return;
+    
+    try {
+        const daten = loadData();
+        
+        // CSV Backup
+        let csv = "Datum,Gewicht kg\n";
+        daten.forEach(x => csv += x.datum + "," + x.gewicht + "\n");
+        
+        const blob = new Blob([csv], { type: "text/csv" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = "Backup_" + new Date().toISOString().split('T')[0] + ".csv";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+        
+        showStatus("📥 Backup erstellt - Update läuft...", "info");
+        
+        setTimeout(async () => {
+            try {
+                // 1. ALLE COOKIES LÖSCHEN
+                document.cookie.split(";").forEach(c => {
+                    document.cookie = c.split("=")[0] + "=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+                });
+                
+                // 2. LOCALSTORAGE LÖSCHEN
+                localStorage.clear();
+                
+                // 3. SESSIONSTORAGE LÖSCHEN
+                sessionStorage.clear();
+                
+                // 4. CACHE LÖSCHEN (NUR WENN VERFÜGBAR)
+                if ("caches" in window) {
+                    try {
+                        const keys = await caches.keys();
+                        for (const key of keys) {
+                            await caches.delete(key);
+                        }
+                    } catch (e) {
+                        console.log("Cache nicht verfügbar");
+                    }
+                }
+                
+                // 5. SERVICE WORKER LÖSCHEN (NUR BEI HTTPS)
+                if ("serviceWorker" in navigator && window.location.protocol !== "file:") {
+                    try {
+                        const regs = await navigator.serviceWorker.getRegistrations();
+                        for (const reg of regs) {
+                            await reg.unregister();
+                        }
+                    } catch (e) {
+                        console.log("Service Worker nicht verfügbar");
+                    }
+                }
+                
+                // 6. SEITE NEU LADEN
+                window.location.reload(true);
+                
+            } catch (e) {
+                showStatus("❌ Fehler: " + e.message, "error");
+            }
+        }, 2000);
+        
+    } catch (e) {
+        showStatus("❌ Fehler: " + e.message, "error");
+    }
+}
 
-let ypos =
-height-30 -
-((x.gewicht-min)/(max-min))
-*
-(height-60);
-
-punkte.push({x: xpos, y: ypos});
-
+// INIT
+document.addEventListener("DOMContentLoaded", function() {
+    const heute = new Date().toISOString().split('T')[0];
+    document.getElementById("datum").value = heute;
+    render();
+    document.getElementById("gewicht").addEventListener("keypress", function(e) {
+        if (e.key === "Enter") addData();
+    });
 });
-
-// Glatte Kurve zeichnen
-ctx.strokeStyle = "#2b7cff";
-ctx.lineWidth = 3;
-zeichneGlatteKurve(ctx, punkte);
-
-// Punkte markieren
-punkte.forEach((p, i) => {
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, 5, 0, 2 * Math.PI);
-    ctx.fillStyle = "#2b7cff";
-    ctx.fill();
-    ctx.strokeStyle = "white";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-});
-
-// Letzten Wert anzeigen
-let last = daten[daten.length-1];
-let lastX = 40 + (daten.length-1) * ((width-60) / (daten.length-1));
-let lastY = height-30 - ((last.gewicht-min)/(max-min)) * (height-60);
-
-ctx.fillStyle = "#2b7cff";
-ctx.font = "bold 12px Arial";
-ctx.textAlign = "left";
-ctx.fillText(last.gewicht + " kg", lastX + 8, lastY - 5);
-
-}
-
-// Datum-Feld auf heute setzen
-document.getElementById("datum").valueAsDate = new Date();
-
-anzeigen();
-
 </script>
-
-<script>
-
-if ("serviceWorker" in navigator) {
-
-    navigator.serviceWorker.register("service-worker.js");
-
-}
-
-</script>
-
 </body>
-
 </html>
