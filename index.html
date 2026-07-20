@@ -219,7 +219,7 @@ function showStatus(msg, type = "info") {
 }
 
 // ============================================
-// CHART - MIT DATENPUNKTEN (WERTEN)
+// CHART - SCHWARZE ZAHLEN, OHNE HINTERGRUND
 // ============================================
 function updateChart() {
     const data = loadData();
@@ -243,7 +243,6 @@ function updateChart() {
     const wrapper = document.getElementById('chartWrapper');
     const canvas = document.getElementById('weightChart');
     
-    // Breite = Anzahl Tage * 80px
     const chartWidth = Math.max(labels.length * 80, wrapper.clientWidth);
     canvas.style.width = chartWidth + 'px';
     canvas.style.height = '280px';
@@ -282,7 +281,6 @@ function updateChart() {
                 legend: {
                     display: false
                 },
-                // DATENWERTE ANZEIGEN ÜBER PUNKTEN
                 tooltip: {
                     callbacks: {
                         label: function(context) {
@@ -317,7 +315,7 @@ function updateChart() {
             }
         },
         plugins: [{
-            // DATENWERTE ÜBER DEN PUNKTEN ANZEIGEN
+            // SCHWARZE ZAHLEN OHNE HINTERGRUND
             afterDraw: function(chart) {
                 const ctx2 = chart.ctx;
                 const xAxis = chart.scales.x;
@@ -331,34 +329,17 @@ function updateChart() {
                     const x = xAxis.getPixelForValue(index);
                     const y = yAxis.getPixelForValue(value);
                     
-                    // Wert mit einer Zahl nach dem Komma
+                    // Wert mit 1 Nachkommastelle oder ohne wenn Ganzzahl
                     const displayValue = value % 1 === 0 ? value : value.toFixed(1);
                     
-                    // Hintergrund für bessere Lesbarkeit
-                    ctx2.font = 'bold 12px -apple-system, sans-serif';
-                    ctx2.textAlign = 'center';
-                    ctx2.textBaseline = 'bottom';
-                    
-                    // Weißer Hintergrund für Text
-                    const text = displayValue + ' kg';
-                    const metrics = ctx2.measureText(text);
-                    const textWidth = metrics.width;
-                    const textHeight = 16;
-                    const padding = 4;
-                    
-                    // Halbtransparenter Hintergrund
-                    ctx2.fillStyle = 'rgba(255, 255, 255, 0.85)';
-                    ctx2.roundRect 
-                        ? ctx2.roundRect(x - textWidth/2 - padding, y - 28, textWidth + padding*2, textHeight + padding*2, 4)
-                        : ctx2.rect(x - textWidth/2 - padding, y - 28, textWidth + padding*2, textHeight + padding*2);
-                    ctx2.fill();
-                    
-                    // Text
-                    ctx2.fillStyle = '#007aff';
+                    // SCHWARZE ZAHLEN, OHNE HINTERGRUND
+                    ctx2.fillStyle = '#000000';
                     ctx2.font = 'bold 11px -apple-system, sans-serif';
                     ctx2.textAlign = 'center';
                     ctx2.textBaseline = 'bottom';
-                    ctx2.fillText(text, x, y - 6);
+                    
+                    // Text immer sichtbar über Punkt
+                    ctx2.fillText(displayValue + ' kg', x, y - 8);
                 });
                 
                 ctx2.restore();
@@ -366,7 +347,7 @@ function updateChart() {
         }]
     });
     
-    // Automatisch nach RECHTS scrollen (neueste Daten)
+    // Automatisch nach RECHTS scrollen
     setTimeout(() => {
         wrapper.scrollLeft = canvas.width - wrapper.clientWidth;
     }, 150);
