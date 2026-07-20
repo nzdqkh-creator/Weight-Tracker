@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="icon.png">
     <title>Gewichtstracker</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -38,23 +39,9 @@
         }
         button:active { opacity: 0.7; }
         .btn-update { background: #ff3b30; }
-        .btn-export { background: #34c759; }
-        .btn-import { background: #ff9500; }
         table { width: 100%; margin-top: 16px; font-size: 15px; }
         th { text-align: left; padding: 8px 0; border-bottom: 2px solid #ddd; }
         td { padding: 8px 0; border-bottom: 1px solid #eee; }
-        .delete-btn {
-            background: #ff3b30;
-            color: white;
-            border: none;
-            padding: 4px 12px;
-            border-radius: 6px;
-            font-size: 14px;
-            cursor: pointer;
-            width: auto;
-            margin: 0;
-        }
-        .delete-btn:active { opacity: 0.7; }
         .empty { text-align: center; padding: 30px 0; color: #999; }
         .status {
             padding: 12px;
@@ -67,17 +54,14 @@
         .status.success { background: #d4edda; color: #155724; }
         .status.error { background: #f8d7da; color: #721c24; }
         .status.info { background: #d1ecf1; color: #0c5460; }
-        .hidden { display: none; }
-        .button-row {
-            display: flex;
-            gap: 8px;
-        }
-        .button-row button {
-            flex: 1;
-            margin-bottom: 10px;
-        }
-        #fileInput {
-            display: none;
+        .delete-btn {
+            background: none;
+            border: none;
+            color: #ff3b30;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 0 8px;
+            width: auto;
         }
     </style>
 </head>
@@ -88,14 +72,7 @@
         <input type="date" id="datum">
         <input type="number" id="gewicht" step="0.1" placeholder="Gewicht in kg">
         <button onclick="addData()">➕ Hinzufügen</button>
-        
-        <div class="button-row">
-            <button class="btn-export" onclick="exportData()">📤 Export</button>
-            <button class="btn-import" onclick="document.getElementById('fileInput').click()">📥 Import</button>
-            <button class="btn-update" onclick="appUpdate()">🔄 Update</button>
-        </div>
-        
-        <input type="file" id="fileInput" accept=".json" onchange="importData(event)">
+        <button class="btn-update" onclick="appUpdate()">🔄 App Update</button>
         
         <div id="status" class="status"></div>
         
@@ -143,20 +120,6 @@ function render() {
     ).join("");
 }
 
-// ============================================
-// EINZELNE ZEILE LÖSCHEN
-// ============================================
-function deleteRow(index) {
-    if (!confirm("Diese Zeile löschen?")) return;
-    const data = loadData();
-    data.splice(index, 1);
-    saveData(data);
-    showStatus("🗑️ Gelöscht", "info");
-}
-
-// ============================================
-// DATEN HINZUFÜGEN
-// ============================================
 function addData() {
     const datum = document.getElementById("datum").value;
     const gewicht = document.getElementById("gewicht").value;
@@ -173,56 +136,15 @@ function addData() {
     showStatus("✅ Hinzugefügt", "success");
 }
 
-// ============================================
-// EXPORT
-// ============================================
-function exportData() {
+// EINZELNE ZEILE LÖSCHEN
+function deleteRow(index) {
+    if (!confirm("Diese Zeile löschen?")) return;
     const data = loadData();
-    if (data.length === 0) {
-        showStatus("Keine Daten zum Exportieren", "error");
-        return;
-    }
-    
-    const json = JSON.stringify(data, null, 2);
-    const blob = new Blob([json], { type: "application/json" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = "gewichtsdaten_" + new Date().toISOString().split('T')[0] + ".json";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(link.href);
-    showStatus("📤 Exportiert", "success");
+    data.splice(index, 1);
+    saveData(data);
+    showStatus("🗑️ Gelöscht", "info");
 }
 
-// ============================================
-// IMPORT
-// ============================================
-function importData(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        try {
-            const data = JSON.parse(e.target.result);
-            if (!Array.isArray(data)) {
-                showStatus("❌ Ungültiges Format", "error");
-                return;
-            }
-            saveData(data);
-            showStatus("📥 Importiert: " + data.length + " Einträge", "success");
-        } catch (err) {
-            showStatus("❌ Fehler beim Import: " + err.message, "error");
-        }
-    };
-    reader.readAsText(file);
-    event.target.value = "";
-}
-
-// ============================================
-// STATUS
-// ============================================
 function showStatus(msg, type = "info") {
     const el = document.getElementById("status");
     el.textContent = msg;
@@ -232,7 +154,7 @@ function showStatus(msg, type = "info") {
 }
 
 // ============================================
-// APP UPDATE
+// APP UPDATE - NUR BACKUP + COOKIES + RELOAD
 // ============================================
 function appUpdate() {
     if (!confirm("Backup erstellen und App aktualisieren?")) return;
@@ -240,7 +162,9 @@ function appUpdate() {
     try {
         const daten = loadData();
         
-        // CSV Backup
+        // ============================================
+        // 1. EXPORT ALS CSV
+        // ============================================
         let csv = "Datum,Gewicht kg\n";
         daten.forEach(x => csv += x.datum + "," + x.gewicht + "\n");
         
@@ -253,18 +177,25 @@ function appUpdate() {
         document.body.removeChild(link);
         URL.revokeObjectURL(link.href);
         
-        showStatus("📥 Backup erstellt - Update läuft...", "info");
+        showStatus("📥 Backup erstellt", "info");
         
+        // ============================================
+        // 2. WARTEN BIS DOWNLOAD FERTIG
+        // ============================================
         setTimeout(async () => {
             try {
-                // Cookies löschen
+                // ALLE COOKIES LÖSCHEN
                 document.cookie.split(";").forEach(c => {
                     document.cookie = c.split("=")[0] + "=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
                 });
                 
+                // LOCALSTORAGE LÖSCHEN
                 localStorage.clear();
+                
+                // SESSIONSTORAGE LÖSCHEN
                 sessionStorage.clear();
                 
+                // CACHE LÖSCHEN
                 if ("caches" in window) {
                     try {
                         const keys = await caches.keys();
@@ -274,6 +205,7 @@ function appUpdate() {
                     } catch (e) {}
                 }
                 
+                // SERVICE WORKER LÖSCHEN
                 if ("serviceWorker" in navigator && window.location.protocol !== "file:") {
                     try {
                         const regs = await navigator.serviceWorker.getRegistrations();
@@ -283,6 +215,7 @@ function appUpdate() {
                     } catch (e) {}
                 }
                 
+                // SEITE NEU LADEN
                 window.location.reload(true);
                 
             } catch (e) {
@@ -300,7 +233,9 @@ function appUpdate() {
 // ============================================
 if ("serviceWorker" in navigator && window.location.protocol !== "file:") {
     window.addEventListener("load", () => {
-        navigator.serviceWorker.register("service-worker.js").catch(() => {});
+        navigator.serviceWorker.register("service-worker.js")
+            .then(() => console.log("✅ SW registriert"))
+            .catch(() => console.log("❌ SW Fehler"));
     });
 }
 
