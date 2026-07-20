@@ -6,6 +6,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icon.png">
     <title>Gewichtstracker</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -41,6 +42,13 @@
         .btn-update { background: #ff3b30; }
         .btn-export { background: #34c759; }
         .btn-import { background: #ff9500; }
+        .chart-container {
+            margin: 16px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            height: 250px;
+        }
         table { width: 100%; margin-top: 16px; font-size: 15px; }
         th { text-align: left; padding: 8px 0; border-bottom: 2px solid #ddd; }
         td { padding: 8px 0; border-bottom: 1px solid #eee; }
@@ -80,9 +88,6 @@
             height: 100%;
             cursor: pointer;
         }
-        .btn-import-wrapper {
-            width: 100%;
-        }
     </style>
 </head>
 <body>
@@ -93,13 +98,18 @@
         <input type="number" id="gewicht" step="0.1" placeholder="Gewicht in kg">
         <button onclick="addData()">➕ Hinzufügen</button>
         
-        <!-- EXPORT BUTTON -->
+        <!-- EXPORT -->
         <button class="btn-export" onclick="exportCSV()">📤 Export CSV</button>
         
-        <!-- IMPORT BUTTON -->
+        <!-- IMPORT -->
         <div class="file-input-wrapper">
             <button class="btn-import" style="width:100%;">📥 Import CSV</button>
             <input type="file" id="fileInput" accept=".csv" onchange="importCSV(event)">
+        </div>
+        
+        <!-- CHART -->
+        <div class="chart-container">
+            <canvas id="weightChart"></canvas>
         </div>
         
         <button class="btn-update" onclick="appUpdate()">🔄 App Update</button>
@@ -117,6 +127,11 @@
 
 <script>
 // ============================================
+// CHART VARIABLE
+// ============================================
+let chart = null;
+
+// ============================================
 // DATEN VERWALTEN
 // ============================================
 function loadData() {
@@ -127,6 +142,7 @@ function loadData() {
 function saveData(data) {
     localStorage.setItem("gewichtDaten", JSON.stringify(data));
     render();
+    updateChart();
 }
 
 function render() {
@@ -141,11 +157,13 @@ function render() {
     }
     
     empty.style.display = "none";
-    tbody.innerHTML = data.map((x, index) => 
+    // Sortieren nach Datum (älteste zuerst für Tabelle)
+    const sorted = [...data].sort((a, b) => new Date(a.datum) - new Date(b.datum));
+    tbody.innerHTML = sorted.map((x, index) => 
         `<tr>
             <td>${x.datum}</td>
             <td>${x.gewicht}</td>
-            <td><button class="delete-btn" onclick="deleteRow(${index})">✕</button></td>
+            <td><button class="delete-btn" onclick="deleteRow('${x.datum}', ${x.gewicht})">✕</button></td>
         </tr>`
     ).join("");
 }
@@ -166,12 +184,15 @@ function addData() {
     showStatus("✅ Hinzugefügt", "success");
 }
 
-function deleteRow(index) {
+function deleteRow(datum, gewicht) {
     if (!confirm("Diese Zeile löschen?")) return;
     const data = loadData();
-    data.splice(index, 1);
-    saveData(data);
-    showStatus("🗑️ Gelöscht", "info");
+    const index = data.findIndex(x => x.datum === datum && x.gewicht === gewicht);
+    if (index !== -1) {
+        data.splice(index, 1);
+        saveData(data);
+        showStatus("🗑️ Gelöscht", "info");
+    }
 }
 
 function showStatus(msg, type = "info") {
@@ -180,6 +201,78 @@ function showStatus(msg, type = "info") {
     el.className = "status show " + type;
     clearTimeout(el._timeout);
     el._timeout = setTimeout(() => el.className = "status", 4000);
+}
+
+// ============================================
+// CHART
+// ============================================
+function updateChart() {
+    const data = loadData();
+    
+    if (data.length === 0) {
+        if (chart) {
+            chart.destroy();
+            chart = null;
+        }
+        return;
+    }
+    
+    // Nach Datum sortieren (für Chart)
+    const sorted = [...data].sort((a, b) => new Date(a.datum) - new Date(b.datum));
+    
+    const labels = sorted.map(x => x.datum);
+    const values = sorted.map(x => x.gewicht);
+    
+    const ctx = document.getElementById('weightChart').getContext('2d');
+    
+    if (chart) {
+        chart.destroy();
+    }
+    
+    chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Gewicht (kg)',
+                data: values,
+                borderColor: '#007aff',
+                backgroundColor: 'rgba(0, 122, 255, 0.1)',
+                fill: true,
+                tension: 0.4,
+                pointBackgroundColor: '#007aff',
+                pointRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: false,
+                    grid: {
+                        color: 'rgba(0,0,0,0.05)'
+                    }
+                },
+                x: {
+                    grid: {
+                        display: false
+                    },
+                    ticks: {
+                        maxRotation: 45,
+                        font: {
+                            size: 10
+                        }
+                    }
+                }
+            }
+        }
+    });
 }
 
 // ============================================
@@ -226,7 +319,6 @@ function importCSV(event) {
                 return;
             }
             
-            // Header überspringen (erste Zeile)
             const data = [];
             for (let i = 1; i < lines.length; i++) {
                 const parts = lines[i].split(",");
@@ -244,7 +336,6 @@ function importCSV(event) {
                 return;
             }
             
-            // Vorhandene Daten laden und ergänzen
             const existingData = loadData();
             const allData = [...existingData, ...data];
             saveData(allData);
@@ -256,8 +347,6 @@ function importCSV(event) {
         }
     };
     reader.readAsText(file);
-    
-    // Input zurücksetzen für erneuten Import gleicher Datei
     event.target.value = "";
 }
 
@@ -270,7 +359,6 @@ function appUpdate() {
     try {
         const daten = loadData();
         
-        // Backup CSV
         let csv = "Datum,Gewicht kg\n";
         daten.forEach(x => csv += x.datum + "," + x.gewicht + "\n");
         
@@ -287,7 +375,6 @@ function appUpdate() {
         
         setTimeout(async () => {
             try {
-                // ALLE COOKIES LÖSCHEN
                 document.cookie.split(";").forEach(c => {
                     document.cookie = c.split("=")[0] + "=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
                 });
@@ -343,6 +430,7 @@ document.addEventListener("DOMContentLoaded", function() {
     const heute = new Date().toISOString().split('T')[0];
     document.getElementById("datum").value = heute;
     render();
+    updateChart();
     document.getElementById("gewicht").addEventListener("keypress", function(e) {
         if (e.key === "Enter") addData();
     });
