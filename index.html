@@ -116,37 +116,38 @@
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>📊 Gewicht</h1>
-        
-        <input type="date" id="datum">
-        <input type="number" id="gewicht" step="0.1" placeholder="Gewicht in kg">
-        <button onclick="addData()">➕ Hinzufügen</button>
-        
-        <button class="btn-export" onclick="exportCSV()">📤 Export CSV</button>
-        
-        <div class="file-input-wrapper">
-            <button class="btn-import" style="width:100%;">📥 Import CSV</button>
-            <input type="file" id="fileInput" accept=".csv" onchange="importCSV(event)">
-        </div>
-        
-        <div class="chart-wrapper" id="chartWrapper">
-            <canvas id="weightChart"></canvas>
-        </div>
-        <div class="chart-scroll-hint" id="scrollHint">← scrollen für ältere Daten | 7 Tage sichtbar →</div>
-        
-        <button class="btn-update" onclick="appUpdate()">🔄 App Update</button>
-        
-        <div id="status" class="status"></div>
-        
-        <div id="tableContainer">
-            <table>
-                <thead><tr><th>Datum</th><th>kg</th><th></th></tr></thead>
-                <tbody id="dataBody"></tbody>
-            </table>
-            <div id="emptyState" class="empty">📭 Keine Daten</div>
-        </div>
+<div class="container">
+    <h1>📊 Gewicht</h1>
+    
+    <!-- CHART GANZ OBEN -->
+    <div class="chart-wrapper" id="chartWrapper">
+        <canvas id="weightChart"></canvas>
     </div>
+    <div class="chart-scroll-hint" id="scrollHint">← scrollen für ältere Daten | 7 Tage sichtbar →</div>
+    
+    <input type="date" id="datum">
+    <input type="number" id="gewicht" step="0.1" placeholder="Gewicht in kg">
+    <button onclick="addData()">➕ Hinzufügen</button>
+    
+    <button class="btn-export" onclick="exportCSV()">📤 Export CSV</button>
+    
+    <div class="file-input-wrapper">
+        <button class="btn-import" style="width:100%;">📥 Import CSV</button>
+        <input type="file" id="fileInput" accept=".csv" onchange="importCSV(event)">
+    </div>
+    
+    <button class="btn-update" onclick="appUpdate()">🔄 App Update</button>
+    
+    <div id="status" class="status"></div>
+    
+    <div id="tableContainer">
+        <table>
+            <thead><tr><th>Datum</th><th>kg</th><th></th></tr></thead>
+            <tbody id="dataBody"></tbody>
+        </table>
+        <div id="emptyState" class="empty">📭 Keine Daten</div>
+    </div>
+</div>
 
 <script>
 // ============================================
