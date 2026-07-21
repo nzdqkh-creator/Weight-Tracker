@@ -367,16 +367,11 @@ function exportCSV() {
     let csv = "Datum,Gewicht kg\n";
     daten.forEach(x => csv += x.datum + "," + x.gewicht + "\n");
     
-    const blob = new Blob([csv], { type: "text/csv" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = "Gewicht_Export_" + new Date().toISOString().split('T')[0] + ".csv";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(link.href);
+    // Automatisch im localStorage speichern (KEINE NACHFRAGE)
+    localStorage.setItem("gewichtExportBackup", csv);
     
-    showStatus("✅ " + daten.length + " Zeilen exportiert", "success");
+    // Status anzeigen
+    showStatus("✅ " + daten.length + " Zeilen lokal gespeichert", "success");
 }
 
 // ============================================
@@ -440,16 +435,10 @@ function appUpdate() {
         let csv = "Datum,Gewicht kg\n";
         daten.forEach(x => csv += x.datum + "," + x.gewicht + "\n");
         
-        const blob = new Blob([csv], { type: "text/csv" });
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.download = "Backup_" + new Date().toISOString().split('T')[0] + ".csv";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(link.href);
+        // BACKUP AUTOMATISCH IM LOCALSTORAGE SPEICHERN (KEINE NACHFRAGE)
+        localStorage.setItem("backupVorUpdate", csv);
         
-        showStatus("📥 Backup erstellt", "info");
+        showStatus("📥 Backup automatisch gespeichert", "info");
         
         setTimeout(async () => {
             try {
