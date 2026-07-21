@@ -435,7 +435,7 @@ function importCSV(event) {
 // APP UPDATE
 // ============================================
 function appUpdate() {
-    if (!confirm("Backup erstellen und App aktualisieren?")) return;
+    if (!confirm("Achtung: Ein Backup wird erstellt. Bitte dies unbedingt speichern, damit Sie es nach der App Aktualisierung wieder importieren können.")) return;
     
     try {
         const daten = loadData();
