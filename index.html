@@ -367,13 +367,21 @@ function exportCSV() {
     let csv = "Datum,Gewicht kg\n";
     daten.forEach(x => csv += x.datum + "," + x.gewicht + "\n");
     
-    // Automatisch im localStorage speichern (KEINE NACHFRAGE)
+    // 1. ALS DATEI SPEICHERN (OHNE NACHFRAGE - automatischer Download)
+    const blob = new Blob([csv], { type: "text/csv" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "Gewicht_Export_" + new Date().toISOString().split('T')[0] + ".csv";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+    
+    // 2. AUCH IM LOCALSTORAGE SPEICHERN
     localStorage.setItem("gewichtExportBackup", csv);
     
-    // Status anzeigen
-    showStatus("✅ " + daten.length + " Zeilen lokal gespeichert", "success");
+    showStatus("✅ " + daten.length + " Zeilen exportiert & lokal gespeichert", "success");
 }
-
 // ============================================
 // IMPORT CSV
 // ============================================
@@ -435,10 +443,20 @@ function appUpdate() {
         let csv = "Datum,Gewicht kg\n";
         daten.forEach(x => csv += x.datum + "," + x.gewicht + "\n");
         
-        // BACKUP AUTOMATISCH IM LOCALSTORAGE SPEICHERN (KEINE NACHFRAGE)
+        // 1. ALS DATEI SPEICHERN (OHNE NACHFRAGE)
+        const blob = new Blob([csv], { type: "text/csv" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = "Backup_" + new Date().toISOString().split('T')[0] + ".csv";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+        
+        // 2. AUCH IM LOCALSTORAGE SPEICHERN
         localStorage.setItem("backupVorUpdate", csv);
         
-        showStatus("📥 Backup automatisch gespeichert", "info");
+        showStatus("📥 Backup erstellt & lokal gespeichert", "info");
         
         setTimeout(async () => {
             try {
@@ -478,7 +496,6 @@ function appUpdate() {
         showStatus("❌ Fehler: " + e.message, "error");
     }
 }
-
 // ============================================
 // SERVICE WORKER
 // ============================================
